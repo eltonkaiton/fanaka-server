@@ -1,11 +1,20 @@
 import express from "express";
-import { getAllItems, getLowStockItems, getItemById } from "../controllers/itemController.js";
+import {
+  getAllItems,
+  getLowStockItems,
+  getItemById,
+  createItem,
+  updateItem
+} from "../controllers/itemController.js";
 
 const router = express.Router();
 
-// Routes
-router.get("/", getAllItems);          // GET /api/items
-router.get("/low-stock", getLowStockItems); // GET /api/items/low-stock
-router.get("/:id", getItemById);       // GET /api/items/:id
+router.get("/", getAllItems);
+router.get("/low-stock", getLowStockItems);
+router.get("/:id", getItemById);
+
+// ✅ ADD THESE
+router.post("/", createItem);        // POST /api/items
+router.put("/:id", updateItem);      // PUT /api/items/:id
 
 export default router;

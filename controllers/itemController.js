@@ -35,3 +35,36 @@ export const getItemById = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch item", error });
   }
 };
+
+
+// Create new item
+export const createItem = async (req, res) => {
+  try {
+    const item = await Item.create(req.body);
+    res.status(201).json(item);
+  } catch (error) {
+    console.error("Create Item Error:", error);
+    res.status(400).json({ message: "Failed to create item", error });
+  }
+};
+
+// Update item (quantity deduction happens here)
+export const updateItem = async (req, res) => {
+  try {
+    const item = await Item.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    res.status(200).json(item);
+  } catch (error) {
+    console.error("Update Item Error:", error);
+    res.status(400).json({ message: "Failed to update item", error });
+  }
+};
+

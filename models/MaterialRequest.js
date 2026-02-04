@@ -1,3 +1,4 @@
+// models/MaterialRequest.js - UPDATE THIS
 import mongoose from 'mongoose';
 
 const materialRequestSchema = new mongoose.Schema({
@@ -13,16 +14,20 @@ const materialRequestSchema = new mongoose.Schema({
   },
   materials: [
     {
-      type: String,
+      type: String, // Consider changing to { name: String, quantity: Number }
       required: true
     }
   ],
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
+    enum: ['pending', 'approved', 'rejected', 'prepared', 'collected'], // ADD 'prepared' and 'collected'
     default: 'pending'
   },
-  createdAt: { type: Date, default: Date.now }
+  requestedAt: { type: Date, default: Date.now },
+  approvedAt: { type: Date },
+  rejectedAt: { type: Date },
+  preparedAt: { type: Date }, // ADD THIS
+  collectedAt: { type: Date }  // ADD THIS
 });
 
 const MaterialRequest = mongoose.model('MaterialRequest', materialRequestSchema);

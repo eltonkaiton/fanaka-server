@@ -8,24 +8,34 @@ import {
   deleteActor,
   loginActor,
   getActorDashboard,
-  confirmPlay,  // ✅ make sure this is included
+  confirmPlay,
   requestMaterials,
+  markMaterialsCollected // ✅ NEW
 } from "../controllers/actorController.js";
 
 const router = express.Router();
 
-// Example routes
+// ------------------ ACTORS CRUD ------------------
 router.post("/", addActor);
 router.get("/", getActors);
 router.get("/:id", getActorById);
 router.put("/:id", updateActor);
 router.delete("/:id", deleteActor);
+
+// ------------------ AUTH ------------------
 router.post("/login", loginActor);
+
+// ------------------ DASHBOARD ------------------
 router.get("/:id/dashboard", getActorDashboard);
 
-// ------------------ CONFIRM PLAY ------------------
+// ------------------ PLAY ACTIONS ------------------
 router.patch("/:playId/confirm", confirmPlay);
 router.post("/:playId/request-materials", requestMaterials);
 
+// ------------------ MATERIAL COLLECTION ------------------
+router.patch(
+  "/request/:requestId/collect",
+  markMaterialsCollected
+);
 
 export default router;

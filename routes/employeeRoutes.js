@@ -132,4 +132,15 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+
+// GET employees by department
+router.get("/department/:dept", async (req, res) => {
+  try {
+    const employees = await Employee.find({ department: req.params.dept }).select("-password");
+    res.json(employees);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;
