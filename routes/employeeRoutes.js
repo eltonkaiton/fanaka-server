@@ -12,14 +12,63 @@ const router = express.Router();
 // =======================
 router.post("/login", async (req, res) => {
   try {
+    console.log("=== LOGIN ATTEMPT DEBUG START ===");
+    console.log("Request body received:", req.body);
+    console.log("Email received:", req.body.email);
+    console.log("Password received (first 3 chars):", req.body.password ? req.body.password.substring(0, 3) + "..." : "undefined");
+    console.log("Password length:", req.body.password ? req.body.password.length : "undefined");
+    
     const { email, password } = req.body;
 
-    const employee = await Employee.findOne({ email });
-    if (!employee) return res.status(400).json({ message: "Employee not found" });
+    // Validate input
+    if (!email || !password) {
+      console.log("Login failed: Missing email or password");
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    // Find employee with case-insensitive email search
+    const employee = await Employee.findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    });
+    
+    console.log("Employee found in DB:", employee ? "YES" : "NO");
+    
+    if (!employee) {
+      console.log(`No employee found with email: ${email}`);
+      // Check if any employees exist with similar emails (debugging)
+      const similarEmployees = await Employee.find({ 
+        email: { $regex: email, $options: 'i' } 
+      }).select("email");
+      console.log("Similar emails in DB:", similarEmployees.map(e => e.email));
+      return res.status(400).json({ message: "Employee not found" });
+    }
+
+    console.log("Employee found details:");
+    console.log("  - ID:", employee._id);
+    console.log("  - Email in DB:", employee.email);
+    console.log("  - Department:", employee.department);
+    console.log("  - Password hash in DB (first 20 chars):", employee.password.substring(0, 20) + "...");
+    console.log("  - Password hash length:", employee.password.length);
 
     // Check password
+    console.log("Comparing password...");
     const isMatch = await bcrypt.compare(password, employee.password);
-    if (!isMatch) return res.status(400).json({ message: "Incorrect email or password" });
+    console.log("Password match result:", isMatch);
+    
+    if (!isMatch) {
+      console.log("Password mismatch. Debug info:");
+      console.log("  - Input password:", password);
+      console.log("  - Input password length:", password.length);
+      console.log("  - Hash verification failed");
+      
+      // Additional debug: Hash a test password to see if bcrypt works
+      const testHash = await bcrypt.hash("test123", 10);
+      console.log("  - Bcrypt test hash generated:", testHash.substring(0, 20) + "...");
+      
+      return res.status(400).json({ message: "Incorrect email or password" });
+    }
+
+    console.log("Password verified successfully");
 
     // Optional: Only allow Production dept to login to Play Manager dashboard
     // (remove this if all employees can log in)
@@ -33,6 +82,9 @@ router.post("/login", async (req, res) => {
       process.env.JWT_SECRET || "super_secret_key",
       { expiresIn: "7d" }
     );
+
+    console.log("Token generated successfully");
+    console.log("=== LOGIN ATTEMPT DEBUG END ===");
 
     res.json({
       message: "Login successful",
@@ -50,8 +102,9 @@ router.post("/login", async (req, res) => {
       token,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Login error details:", err);
+    console.error("Error stack:", err.stack);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
@@ -131,7 +184,6 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // GET employees by department
 router.get("/department/:dept", async (req, res) => {

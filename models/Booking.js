@@ -15,17 +15,27 @@ const bookingSchema = new mongoose.Schema({
   paymentMethod: { type: String, required: true, default: 'manual' },
   paymentCode: { type: String, required: true },
   paymentStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
-  approvedBy: { type: String, default: null }, // CHANGED from ObjectId to String
+  approvedBy: { type: String, default: null },
   approvedAt: { type: Date, default: null },
   playDate: { type: Date, required: true },
-  status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' },
-  bookingDate: { type: Date, default: Date.now }
+  status: { 
+    type: String, 
+    enum: ['pending', 'confirmed', 'cancelled', 'checked_in', 'completed'], // ✅ ADDED 'checked_in' and 'completed'
+    default: 'pending' 
+  },
+  bookingDate: { type: Date, default: Date.now },
+  // ✅ ADDED CHECK-IN FIELDS
+  checkedIn: { type: Boolean, default: false },
+  checkInTime: { type: Date, default: null },
+  checkedBy: { type: String, default: null } // usher/attendant who checked in
 }, { timestamps: true });
 
 bookingSchema.index({ customerEmail: 1, bookingDate: -1 });
 bookingSchema.index({ bookingReference: 1 });
 bookingSchema.index({ playId: 1 });
 bookingSchema.index({ paymentStatus: 1 });
+bookingSchema.index({ status: 1 });
+bookingSchema.index({ checkedIn: 1 }); // ✅ ADDED index for check-in queries
 
 const Booking = mongoose.model('Booking', bookingSchema);
 export default Booking;
