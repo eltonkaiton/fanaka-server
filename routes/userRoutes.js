@@ -5,24 +5,22 @@ import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
-// JWT Secret (store this in .env in production)
+// JWT Secret (store in .env in production)
 const JWT_SECRET = "your_jwt_secret_key_change_in_production";
 
 // Middleware to verify JWT token
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
-    
+
     if (!token) {
       return res.status(401).json({ message: "No authentication token" });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.userId).select("-password");
-    
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
+
+    if (!user) return res.status(401).json({ message: "User not found" });
 
     req.user = user;
     req.userId = decoded.userId;
@@ -34,7 +32,7 @@ const authMiddleware = async (req, res, next) => {
 
 // ---------------------- UNPROTECTED ROUTES ----------------------
 
-// GET all users OR filter by status (no auth required)
+// GET all users OR filter by status
 router.get("/", async (req, res) => {
   try {
     const { status } = req.query;
@@ -49,32 +47,32 @@ router.get("/", async (req, res) => {
   }
 });
 
-// REGISTER / ADD NEW USER (no auth required)
+/// REGISTER / ADD NEW USER
 router.post("/register", async (req, res) => {
   try {
     const { username, fullName, email, phone, password, role } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "User with this email already exists" });
     }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
       username,
       fullName,
       email,
       phone,
-      password: hashedPassword,
-      role: role || "Audience", // default to Audience
-      status: "Active"
+      password, // Schema will hash this automatically
+      role: role || "Audience"
     });
 
-    await newUser.save();
+    await newUser.save(); // Password hashed in schema
 
-    const token = jwt.sign({ userId: newUser._id }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(
+      { userId: newUser._id },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     const userWithoutPassword = newUser.toObject();
     delete userWithoutPassword.password;
@@ -84,12 +82,13 @@ router.post("/register", async (req, res) => {
       user: userWithoutPassword,
       token
     });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// LOGIN (no auth required)
+// LOGIN
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -119,9 +118,51 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// ---------------------- UNPROTECTED STATUS UPDATE ----------------------
+// Only for changing user status (Pending → Active / Rejected / etc.)
+router.put("/:id/status", async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    if (!["Pending", "Active", "Rejected", "Suspended"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status value" });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    user.status = status;
+    await user.save();
+
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+
+    res.json({
+      message: `User status updated to ${status}`,
+      user: updatedUser
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------- UNPROTECTED DELETE ----------------------
+// Delete a user without token
+router.delete("/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------------------- PROTECTED ROUTES ----------------------
 
-// GET user profile (protected)
+// GET user profile
 router.get("/profile", authMiddleware, async (req, res) => {
   try {
     res.json(req.user);
@@ -139,7 +180,7 @@ router.get("/me", authMiddleware, async (req, res) => {
   }
 });
 
-// LOGOUT (protected, optional)
+// LOGOUT
 router.post("/logout", authMiddleware, async (req, res) => {
   try {
     res.json({ message: "Logged out successfully" });
@@ -148,7 +189,7 @@ router.post("/logout", authMiddleware, async (req, res) => {
   }
 });
 
-// UPDATE user (protected)
+// UPDATE user (protected, everything except status)
 router.put("/:id", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -158,7 +199,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ error: "Not authorized to update this user" });
     }
 
-    const { username, fullName, email, phone, password, role, status } = req.body;
+    const { username, fullName, email, phone, password, role } = req.body;
 
     if (username) user.username = username;
     if (fullName) user.fullName = fullName;
@@ -166,27 +207,13 @@ router.put("/:id", authMiddleware, async (req, res) => {
     if (phone) user.phone = phone;
     if (role && req.user.role === "admin") user.role = role;
     if (password && password.trim() !== "") user.password = await bcrypt.hash(password, 10);
-    if (status && ["Pending", "Active", "Rejected", "Suspended"].includes(status)) user.status = status;
 
     await user.save();
 
     const updatedUser = user.toObject();
     delete updatedUser.password;
+
     res.json(updatedUser);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// DELETE user (protected, admin only)
-router.delete("/:id", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: "User deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
