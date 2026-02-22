@@ -229,44 +229,29 @@ router.put("/:id/deliver", async (req, res) => {
   }
 });
 
-// MARK AS RECEIVED - UPDATED TO SET PAYMENT PENDING
+// MARK AS RECEIVED - UPDATED WITH YOUR SPECIFIC IMPLEMENTATION
 router.put("/:id/receive", async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id).populate("item");
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
     if (order.status !== "Delivered") return res.status(400).json({ success: false, message: "Only delivered orders can be marked as received" });
     if (order.status === "Received") return res.status(400).json({ success: false, message: "Order is already marked as received" });
 
     // Update inventory stock
     if (order.item) {
-      const item = await Item.findById(order.item);
+      const item = await Item.findById(order.item._id);
       if (item) {
-        const validCategories = ["Electronics", "Furniture", "Stationery", "Cleaning", "Food", "Beverages", "Office", "Medical", "Equipment", "Other"];
-        if (!validCategories.includes(item.category)) {
-          if (item.category === "equipment") item.category = "Equipment";
-          else if (item.category === "Tools" || item.category === "tools") item.category = "Equipment";
-          else item.category = "Other";
-        }
-        item.currentStock += order.quantity;
+        item.currentStock = (item.currentStock || 0) + order.quantity;
         item.lastRestocked = new Date();
-        try {
-          await item.save();
-        } catch (saveError) {
-          if (saveError.name === 'ValidationError') {
-            await Item.updateOne(
-              { _id: item._id },
-              { $inc: { currentStock: order.quantity }, $set: { lastRestocked: new Date() } }
-            );
-          } else throw saveError;
-        }
+        await item.save();
       }
     }
 
-    // MARK ORDER AS RECEIVED AND SET PAYMENT PENDING
-    order.status = "Payment Pending";
-    order.payment.status = "Pending";
+    // MARK ORDER AS RECEIVED - Set to "Received" (not "Payment Pending")
+    order.status = "Received";  // Use "Received" for clarity
+    order.payment.status = "Pending"; // Still set payment pending
     await order.save();
-    
+
     res.json({
       success: true,
       message: "Order marked as received. Inventory updated. Order is now ready for payment submission.",
@@ -292,10 +277,10 @@ router.put("/:id/submit-payment", async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
-    if (order.status !== "Payment Pending") {
+    if (order.status !== "Received") {
       return res.status(400).json({
         success: false,
-        message: "Only orders with 'Payment Pending' status can have payment submitted"
+        message: "Only orders with 'Received' status can have payment submitted"
       });
     }
 
@@ -834,7 +819,7 @@ router.put("/:id/cancel", async (req, res) => {
     }
 
     // If order was delivered/received, revert inventory
-    if ((order.status === "Delivered" || order.status === "Received" || order.status === "Payment Pending") && order.item) {
+    if ((order.status === "Delivered" || order.status === "Received") && order.item) {
       const item = await Item.findById(order.item);
       if (item) {
         item.currentStock -= order.quantity;
