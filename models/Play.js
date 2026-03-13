@@ -67,7 +67,7 @@ playSchema.index({ "materialRequests.actor": 1 });
 // Virtual field to get full image URL if needed
 playSchema.virtual("imageUrl").get(function () {
   if (!this.image) return null;
-  return `${process.env.SERVER_URL || "https://fanaka-server-1.onrender.com"}${this.image}`;
+  return `${process.env.SERVER_URL || "http://localhost:5000"}${this.image}`;
 });
 
 // Virtual for formatted date

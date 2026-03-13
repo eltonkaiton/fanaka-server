@@ -234,7 +234,7 @@ router.put("/:id/receive", async (req, res) => {
   try {
     const order = await Order.findById(req.params.id).populate("item");
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
-    if (order.status !== "Delivered") return res.status(400).json({ success: false, message: "Only delivered orders can be marked as received" });
+    if (order.status !== "delivered") return res.status(400).json({ success: false, message: "Only delivered orders can be marked as received" });
     if (order.status === "Received") return res.status(400).json({ success: false, message: "Order is already marked as received" });
 
     // Update inventory stock

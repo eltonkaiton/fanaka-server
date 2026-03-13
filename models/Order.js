@@ -1,4 +1,3 @@
-// models/Order.js
 import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema({
@@ -32,7 +31,7 @@ const orderSchema = new mongoose.Schema({
   deliveryDate: Date,
   status: {
     type: String,
-    enum: ["Pending", "Approved", "Processing", "Delivered", "Received", "Payment Pending", "Paid", "Rejected", "Cancelled"],
+    enum: ["Pending", "pending","Approved","approved", "processing","Processing", "Delivered","delivered","received", "Received", "Payment Pending", "Paid", "Rejected", "Cancelled"],
     default: "Pending"
   },
 
@@ -43,14 +42,14 @@ const orderSchema = new mongoose.Schema({
       enum: ["Pending", "Submitted", "Approved", "Paid", "Rejected", "Confirmed"],
       default: "Pending"
     },
-    
+
     // Payment submission by finance/accountant
     submittedBy: {
       id: String,
       name: String
     },
     submittedAt: Date,
-    
+
     // Payment method details
     paymentMethod: {
       type: String,
@@ -58,25 +57,25 @@ const orderSchema = new mongoose.Schema({
     },
     transactionId: String,
     paymentDate: Date,
-    
+
     // Payment approval (optional, for approval workflows)
     approvedBy: {
       id: String,
       name: String
     },
     approvedAt: Date,
-    
+
     // Payment processing (who actually processed the payment)
     processedBy: {
       id: String,
       name: String
     },
     processedAt: Date,
-    
+
     // Payment amount details
     amountPaid: Number,
     paymentProof: String, // URL to payment proof/document
-    
+
     // Supplier confirmation of payment receipt
     supplierConfirmation: {
       type: Boolean,
@@ -90,7 +89,7 @@ const orderSchema = new mongoose.Schema({
     confirmationDate: Date,
     transactionProof: String, // Proof/reference provided by supplier
     confirmationNotes: String,
-    
+
     // General payment notes
     notes: String
   },
@@ -105,24 +104,45 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Helper to normalise a status string to the exact enum value (case‑insensitive)
+const normaliseStatus = (value, allowedValues) => {
+  if (!value || typeof value !== 'string') return value;
+  const lowerValue = value.toLowerCase();
+  const match = allowedValues.find(opt => opt.toLowerCase() === lowerValue);
+  return match || value; // fallback to original if no match (will trigger validation error)
+};
+
+// Pre-save middleware to calculate total cost and normalise status fields
+orderSchema.pre('save', function(next) {
+  // Calculate total cost
+  if (this.quantity && this.unitPrice) {
+    this.totalCost = this.quantity * this.unitPrice;
+  }
+
+  // Update payment amount if not set
+  if (this.payment && !this.payment.amountPaid && this.totalCost) {
+    this.payment.amountPaid = this.totalCost;
+  }
+
+  // Normalise main order status (case‑insensitive)
+  const allowedMainStatuses = ["Pending", "Approved", "Processing", "Delivered", "Received", "Payment Pending", "Paid", "Rejected", "Cancelled"];
+  if (this.status) {
+    this.status = normaliseStatus(this.status, allowedMainStatuses);
+  }
+
+  // Normalise payment status (if payment subdocument exists)
+  if (this.payment && this.payment.status) {
+    const allowedPaymentStatuses = ["Pending", "Submitted", "Approved", "Paid", "Rejected", "Confirmed"];
+    this.payment.status = normaliseStatus(this.payment.status, allowedPaymentStatuses);
+  }
+
+  next();
+});
+
 // Indexes for performance
 orderSchema.index({ status: 1 });
 orderSchema.index({ "payment.status": 1 });
 orderSchema.index({ "payment.supplierConfirmation": 1 });
 orderSchema.index({ supplier: 1 });
-
-// Pre-save middleware to calculate total cost
-orderSchema.pre('save', function(next) {
-  if (this.quantity && this.unitPrice) {
-    this.totalCost = this.quantity * this.unitPrice;
-  }
-  
-  // Update payment amount if not set
-  if (this.payment && !this.payment.amountPaid && this.totalCost) {
-    this.payment.amountPaid = this.totalCost;
-  }
-  
-  next();
-});
 
 export default mongoose.model("Order", orderSchema);
