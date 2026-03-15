@@ -593,4 +593,27 @@ router.patch("/:playId/material-requests/:requestId/collect", async (req, res) =
   }
 });
 
+// GET count of active plays (date >= today)
+router.get("/active/count", async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const count = await Play.countDocuments({ date: { $gte: today } });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET count of upcoming shows (same as active plays, or your own logic)
+router.get("/upcoming/count", async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const count = await Play.countDocuments({ date: { $gte: today } });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 export default router;

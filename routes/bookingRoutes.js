@@ -449,4 +449,15 @@ router.put("/:id", requireAuth, [
   }
 });
 
+// GET total number of bookings (optionally filtered)
+router.get("/total/count", requireAuth, async (req, res) => {
+  try {
+    const { status } = req.query; // e.g., ?status=confirmed
+    const filter = status ? { status } : {};
+    const count = await Booking.countDocuments(filter);
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 export default router;
