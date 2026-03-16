@@ -460,4 +460,46 @@ router.get("/total/count", requireAuth, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ✅ CANCEL BOOKING (for users)
+router.put("/:id/cancel", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, msg: "Booking not found" });
+    }
+
+    // Optional: allow cancellation only if it's not already cancelled/checked in
+    if (booking.status === "cancelled") {
+      return res.status(400).json({ success: false, msg: "Booking already cancelled" });
+    }
+    if (booking.checkedIn) {
+      return res.status(400).json({ success: false, msg: "Cannot cancel a checked-in booking" });
+    }
+    if (booking.status === "checked_in") {
+      return res.status(400).json({ success: false, msg: "Cannot cancel a checked-in booking" });
+    }
+
+    booking.status = "cancelled";
+    await booking.save();
+
+    res.json({
+      success: true,
+      msg: "Booking cancelled successfully",
+      booking: {
+        id: booking._id,
+        bookingReference: booking.bookingReference,
+        status: booking.status
+      }
+    });
+  } catch (err) {
+    console.error("CANCEL BOOKING ERROR:", err);
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ success: false, msg: "Invalid booking ID" });
+    }
+    res.status(500).json({ success: false, msg: "Server error", error: err.message });
+  }
+});
 export default router;
